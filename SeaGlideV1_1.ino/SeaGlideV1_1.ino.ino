@@ -15,8 +15,8 @@ static int maxCoast = 20000;         // if the pot is turned all the way to the 
 static byte servoDiveCommand = 0;    // this is the angle value that the dive method sends to the servo
 static byte servoRiseCommand = 180;  // this is the angle value that the rise method sends to the servo
 
-static int riseDriveTime = 14000;   //18000; // fornew lead plunger 
-
+long currentPistonPosition = 0;
+static int MaxPistonPosition = 14000;
 // Pins 
 static byte SERVO_PIN = 10;          // the pin that the "continuous rotation servo" is attached to, this motor drives the buoyancy engine
 static byte DIVE_STOP = 11;          // the pin that the dive limmit switch (round push button) is attached to
@@ -81,7 +81,7 @@ void loop(){                    // begin main loop
   while(v<2){
     dive(0);                      // DIVE-DIVE-DIVE: Run the "dive" method. This will start turning the servo to take in water & pitch the glider down
     delayTwo(readPot(POT_PIN));      // read the pot and delay bassed on it's position, coast
-    rise(riseDriveTime);          // Rise: Run the "rise" method. This will start turning the servo to push out water & pitch the glider up
+    rise(MaxPistonPosition);          // Rise: Run the "rise" method. This will start turning the servo to push out water & pitch the glider up
     delayTwo(readPot(POT_PIN)*1.1);  // Read the pot and delay bassed on it's position, coast
     v++;
   }
@@ -90,55 +90,81 @@ void loop(){                    // begin main loop
 
 void dive(int time){                            // Dive: Run the "dive" method. This will start turning the servo to take in water & pitch the glider down
   int x = 0;
-  ledRGB_Write(255, 0, 0);                      // set LED to RED to indicate that the glider is diving
+  int startPistonPosition= currentPistonPosition;
+  
+ 
   //Serial.println("diving");                     // print status change to the serial port
   myservo.attach(SERVO_PIN);                    // attaches the servo on "SERVO_PIN" to the servo object so that we can command the servo to turn
   myservo.write(servoDiveCommand);              // drive servo clockwise, take in water & pull weight forward (pull counterweight & plunger towards servo, at the bow of the glider)
-      unsigned long currentMillis = millis();
-      long previousMillis = currentMillis;
+  long previousMillis = millis();
+  long deltaMillis;                             //delta==change
+  deltaMillis=millis()-previousMillis;
   if (time == 0){
     while (digitalRead(DIVE_STOP) == HIGH){     // keep checking the DIVE_STOP pin to see if the button is pressed
-      currentMillis = millis();
-        if((currentMillis - previousMillis)>(sampleInt*x)){
+      deltaMillis=millis()-previousMillis;
+        if(deltaMillis>(sampleInt*x)){
           Sample();
           x++;
         }
-      // wait...                                // just keep checking: when the button is pressed, continue to the next line
+      currentPistonPosition=startPistonPosition-deltaMillis;
+      mapLED();
+    
     }
   }
   else{
-    while (currentMillis - previousMillis < time && digitalRead(DIVE_STOP) ) { 
-      currentMillis = millis();   
-      if((currentMillis - previousMillis)>(sampleInt*x)){
+    while (deltaMillis < time && digitalRead(DIVE_STOP) ) { 
+      deltaMillis=millis()-previousMillis;
+      if(deltaMillis>(sampleInt*x)){
           Sample();
           x++;
         }
+      currentPistonPosition=startPistonPosition-deltaMillis;
+      mapLED();
     }   
   }
   myservo.detach();                             // stop the servo, detaches the servo on SERVO_PIN from the servo object
-  //Serial.println("coasting (dive)");            // print status change to the serial port
-  ledRGB_Write(255, 80, 0);                     // set LED to ORANGE to indicate that the glider is coasting in a dive
+  currentPistonPosition=0;
+  mapLED();
+  //ledRGB_Write(255, 0, 0);                     // set LED to ORANGE to indicate that the glider is coasting in a dive
 }                                               // end of method
 
 void rise(int time){                            // Rise: Run the "rise" method. This will start turning the servo to push out water & pitch the glider up
   int x = 0;
-  ledRGB_Write(0, 200, 0);                      // set LED to GREEN to indicate that the glider is rising
+  //ledRGB_Write(0, 200, 0);                      // set LED to GREEN to indicate that the glider is rising
   //Serial.println("rising");                     // print status change to the serial port
+  int startPistonPosition=currentPistonPosition;
+  if(currentPistonPosition+time>=MaxPistonPosition){ //if plunger is already at maximum position no need to keep pushing it. 
+    if(MaxPistonPosition-currentPistonPosition<500)
+      return;                                         //exit function
+    else
+      time=MaxPistonPosition-currentPistonPosition;
+  }
   myservo.attach(SERVO_PIN);                    // attaches the servo on SERVO_PIN to the servo object
   myservo.write(servoRiseCommand);              // drive servo counter-clockwise, pull weight aft (push counterweight & plunger away from servo)
-  unsigned long currentMillis = millis();
-  long previousMillis = currentMillis;
-  while (currentMillis - previousMillis < time) { 
-    currentMillis = millis();  
-    if((currentMillis - previousMillis)>(sampleInt*x)){
+ // unsigned long currentMillis = millis();
+  long previousMillis = millis();
+  long deltaMillis;                             //delta==change
+  deltaMillis=millis()-previousMillis;
+  while (deltaMillis< time) { 
+     
+    if((currentPistonPosition+deltaMillis)>=MaxPistonPosition) break;
+    currentPistonPosition=startPistonPosition+deltaMillis;
+    mapLED();
+    if(deltaMillis>(sampleInt*x)){
       Sample();
       x++;
     }
-    // wait...                                  // just keep checking, when the sensor sees the edge, continue to the next line
+    
+    //currentMillis = millis();
+    deltaMillis=millis()-previousMillis; 
+    
   }
   myservo.detach();                             // stop the servo, detaches the servo on SERVO_PIN from the servo object
+  //currentMillis=millis();
+  currentPistonPosition=startPistonPosition+deltaMillis; //Update system on plunger position
+  mapLED();
   //Serial.println("coasting (rise)");            // print status change to the serial port
-  ledRGB_Write(0, 0, 255);                      // set LED to BLUE to indicate that the glider is coasting in a rise
+  //ledRGB_Write(0, 0, 255);                      // set LED to BLUE to indicate that the glider is coasting in a rise
 }                                               // end of method
 
 void ledRGB_Write(byte R, byte G, byte B){      // This method takes care of the details of setting a color and intensity of the RGB LED
@@ -146,6 +172,12 @@ void ledRGB_Write(byte R, byte G, byte B){      // This method takes care of the
   analogWrite(GREEN_LED, 255-G);                // This method reverses the counterintuitive nature of the LEDs
   analogWrite(BLUE_LED, 255-B);                 // If using common anode rather than common anode LEDs remove the "255-"es
 }                                               // end of method
+
+void mapLED(){
+  int ledValue = map(currentPistonPosition, 0, MaxPistonPosition, 0, 255);
+  ledRGB_Write(255-ledValue, 0, ledValue);
+
+}
 
 int readPot(int potPin){                        // this method reads a potentiometer to determine the pause time
   int potValue = analogRead(potPin);            // Read the Potentiometer
