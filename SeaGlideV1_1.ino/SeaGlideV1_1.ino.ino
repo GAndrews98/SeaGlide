@@ -15,7 +15,7 @@ static int maxCoast = 20000;         // if the pot is turned all the way to the 
 static byte servoDiveCommand = 0;    // this is the angle value that the dive method sends to the servo
 static byte servoRiseCommand = 180;  // this is the angle value that the rise method sends to the servo
 
-static int riseDriveTime = 13000;   //18000; // fornew lead plunger 
+static int riseDriveTime = 14000;   //18000; // fornew lead plunger 
 
 // Pins 
 static byte SERVO_PIN = 10;          // the pin that the "continuous rotation servo" is attached to, this motor drives the buoyancy engine
@@ -46,7 +46,7 @@ char depthStr[10];
 char tempStr[10];
 
 //------Logger---------
-int sampleInt = 2000;
+int sampleInt = 1000;
 int milsec = 0;
 int i = 0;
 
@@ -78,7 +78,7 @@ void setup() {                       // begin setup method
 
 void loop(){                    // begin main loop
   int v=0;
-  while(v<1){
+  while(v<2){
     dive(0);                      // DIVE-DIVE-DIVE: Run the "dive" method. This will start turning the servo to take in water & pitch the glider down
     delayTwo(readPot(POT_PIN));      // read the pot and delay bassed on it's position, coast
     rise(riseDriveTime);          // Rise: Run the "rise" method. This will start turning the servo to push out water & pitch the glider up
@@ -225,29 +225,51 @@ void delayTwo(int time){                            // Rise: Run the "rise" meth
 }                                               // end of method
 void loopTwo(){
 
+  int pistonTime=2000;
+  int TargetDepth=30;
+  
   while(true){
-    if(ResultDepth>35||ResultDepth<33){ //If glider is deeper than 25cm or shallower than 15cm
-      while(vertVel<=5&&ResultDepth<33){  //if glider vertical velocity is not diving at a rate of .5cm/sample AND glider is shallower than 15cm
+    while(ResultDepth<TargetDepth){ //If glider is deeper than 25cm or shallower than 15cm
+      while(vertVel<=5){  //if glider vertical velocity is not diving at a rate of .5cm/sample AND glider is shallower than 15cm
         dive(1000);                      // DIVE-DIVE-DIVE: Run the "dive" method. This will start turning the servo to take in water & pitch the glider down
         delayTwo(1000);      // read the pot and delay bassed on it's position, coast
        }
+    Serial.print("Diving, Waiting for Target depth:");
+    Serial.print(ResultDepth);
+    Serial.print(" of ");
+    Serial.println(TargetDepth);
+    delayTwo(1000);
     }
-    while(ResultDepth>33&&ResultDepth<35){
-      if(vertVel>.5)
-        rise(500);
-      else if(vertVel<-.5)
-        dive(500);  
-      delayTwo(1000);
-      if(vertVel<.1&&vertVel>-.1){
-        ledRGB_Write(255, 0, 255);  
-        while(true){
-          delayTwo(5000);
-        }
+    Serial.println("Reached Target Depth");
+    while(pistonTime>=125){
+      if(ResultDepth>TargetDepth){
+          riseToTarget(TargetDepth, pistonTime);
       }
+      else if(ResultDepth<TargetDepth){
+          diveToTarget(TargetDepth, pistonTime);
+      }
+      pistonTime=pistonTime/2;
+    }  
+    ledRGB_Write(255,0,255);
+    while(true){
+      Serial.println("At targetDepth");
+      delayTwo(5000);
     }
-    Sample();
+    //Sample();//Caused too many samples ~10/second
   }
 }
+void riseToTarget(int target, int drivetime){
+    Serial.println("Rise to Target Depth");
+    while(ResultDepth>target){
+        rise(drivetime);
+        delayTwo(2000);
+    }
 
-
-
+}
+void diveToTarget(int target, int drivetime){
+  Serial.println("Dive to Target Depth");
+  while(ResultDepth<target){
+      dive(drivetime);
+      delayTwo(2000);
+  }
+}
