@@ -16,7 +16,7 @@ static byte servoDiveCommand = 0;    // this is the angle value that the dive me
 static byte servoRiseCommand = 180;  // this is the angle value that the rise method sends to the servo
 
 long currentPistonPosition = 0;
-static int MaxPistonPosition = 14000;
+static int MaxPistonPosition = 15000;
 // Pins 
 static byte SERVO_PIN = 10;          // the pin that the "continuous rotation servo" is attached to, this motor drives the buoyancy engine
 static byte DIVE_STOP = 11;          // the pin that the dive limmit switch (round push button) is attached to
@@ -88,38 +88,47 @@ void loop(){                    // begin main loop
 void dive(int time){                            // Dive: Run the "dive" method. This will start turning the servo to take in water & pitch the glider down.
   int x = 0;
   int startPistonPosition= currentPistonPosition;
-  
+ 
   myservo.attach(SERVO_PIN);                    // attaches the servo on "SERVO_PIN" to the servo object so that we can command the servo to turn
   myservo.write(servoDiveCommand);              // drive servo clockwise, take in water & pull weight forward (pull counterweight & plunger towards servo, at the bow of the glider)
-  long previousMillis = millis();
-  long deltaMillis;                             //delta==change
-  deltaMillis=millis()-previousMillis;
+  unsigned long currentMillis=millis();
+  long previousMillis = currentMillis;
   if (time == 0){
+    Serial.println("Waiting for Stop Button");
     while (digitalRead(DIVE_STOP) == HIGH){     // keep checking the DIVE_STOP pin to see if the button is pressed
-      deltaMillis=millis()-previousMillis;
-        if(deltaMillis>(sampleInt*x)){
-          Sample();
-          x++;
-        }
-      currentPistonPosition=startPistonPosition-deltaMillis;
-      mapLED(); 
+      
+      currentMillis=millis();
+      if(currentMillis-previousMillis>(sampleInt*x)){
+        Sample();
+        x++;
+        currentPistonPosition=startPistonPosition-(currentMillis-previousMillis);
+        mapLED(); 
+      }
+      
     
     }
+    myservo.detach();                             // stop the servo, detaches the servo on SERVO_PIN from the servo object
+    currentPistonPosition=0;
+    mapLED();
   }
   else{
-    while (deltaMillis < time && digitalRead(DIVE_STOP) ) { 
-      deltaMillis=millis()-previousMillis;
-      if(deltaMillis>(sampleInt*x)){
+    Serial.print("Diving for time: ");
+    Serial.println(time);
+    while (currentMillis-previousMillis < time && digitalRead(DIVE_STOP) ) { 
+      currentMillis=millis();
+      if(currentMillis-previousMillis>(sampleInt*x)){
           Sample();
           x++;
         }
-      currentPistonPosition=startPistonPosition-deltaMillis;
-      mapLED();
-    }   
+
+    }
+    myservo.detach();                             // stop the servo, detaches the servo on SERVO_PIN from the servo object   
+    currentPistonPosition=startPistonPosition-(currentMillis-previousMillis);
+    mapLED();
   }
-  myservo.detach();                             // stop the servo, detaches the servo on SERVO_PIN from the servo object
-  currentPistonPosition=0;
-  mapLED();
+  
+  
+  
   
 }                                               // end of method
 
@@ -127,34 +136,40 @@ void rise(int time){                            // Rise: Run the "rise" method. 
   int x = 0;
   int startPistonPosition=currentPistonPosition;
   if(currentPistonPosition+time>=MaxPistonPosition){ //if plunger is already at maximum position no need to keep pushing it. 
+    Serial.println("piston near max");
     if(MaxPistonPosition-currentPistonPosition<500)
       return;                                         //exit function
     else
       time=MaxPistonPosition-currentPistonPosition;
   }
+  else
+    Serial.print("Time to rise servo: ");
+    Serial.println(time);
   myservo.attach(SERVO_PIN);                    // attaches the servo on SERVO_PIN to the servo object
   myservo.write(servoRiseCommand);              // drive servo counter-clockwise, pull weight aft (push counterweight & plunger away from servo)
-  long previousMillis = millis();
-  long deltaMillis;                             //delta==change
-  deltaMillis=millis()-previousMillis;
+  unsigned long currentMillis = millis();
+  long previousMillis = currentMillis;
   
-  while (deltaMillis< time) { 
+  
+  
+  while (currentMillis-previousMillis< time) { 
      
-    if((currentPistonPosition+deltaMillis)>=MaxPistonPosition) break;
-    currentPistonPosition=startPistonPosition+deltaMillis;
-    mapLED();
-    if(deltaMillis>(sampleInt*x)){
+    if((startPistonPosition+(currentMillis-previousMillis))>=MaxPistonPosition) break;
+    
+    
+    if(currentMillis-previousMillis>(sampleInt*x)){
       Sample();
+      currentPistonPosition=startPistonPosition+(currentMillis-previousMillis);
+      mapLED();
       x++;
     }
     
-    //currentMillis = millis();
-    deltaMillis=millis()-previousMillis; 
+  currentMillis=millis();
     
   }
   myservo.detach();                             // stop the servo, detaches the servo on SERVO_PIN from the servo object
-  
-  currentPistonPosition=startPistonPosition+deltaMillis; //Update system on plunger position
+  currentMillis=millis();
+  currentPistonPosition=startPistonPosition+(currentMillis-previousMillis); //Update system on plunger position
   mapLED();
   
 }                                               // end of method
@@ -166,7 +181,11 @@ void ledRGB_Write(byte R, byte G, byte B){      // This method takes care of the
 }                                               // end of method
 
 void mapLED(){
+  Serial.print("Piston position: ");
+  Serial.println(currentPistonPosition);
   int ledValue = map(currentPistonPosition, 0, MaxPistonPosition, 0, 255);
+  Serial.print("LED Value: ");
+  Serial.println(ledValue);
   ledRGB_Write(255-ledValue, 0, ledValue);
 
 }
@@ -237,9 +256,7 @@ void delayTwo(int time){
     }
     // wait...                                  // just keep checking, when the sensor sees the edge, continue to the next line
   }                // set LED to BLUE to indicate that the glider is coasting in a rise
-   if(time < sampleInt){
-      Sample();
-    }
+
 }                                               // end of method
 void loopTwo(){
 
