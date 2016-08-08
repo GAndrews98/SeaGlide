@@ -46,12 +46,9 @@ char depthStr[10];
 char tempStr[10];
 
 //------Logger---------
-int sampleInt = 1000;
+int sampleInt = 2000;
 int milsec = 0;
 int i = 0;
-
-// Vertical velocity calculations
-float vertVel=0.0;
 
 
 void setup() {                       // begin setup method
@@ -88,12 +85,10 @@ void loop(){                    // begin main loop
   loopTwo();
 }                               // end main loop
 
-void dive(int time){                            // Dive: Run the "dive" method. This will start turning the servo to take in water & pitch the glider down
+void dive(int time){                            // Dive: Run the "dive" method. This will start turning the servo to take in water & pitch the glider down.
   int x = 0;
   int startPistonPosition= currentPistonPosition;
   
- 
-  //Serial.println("diving");                     // print status change to the serial port
   myservo.attach(SERVO_PIN);                    // attaches the servo on "SERVO_PIN" to the servo object so that we can command the servo to turn
   myservo.write(servoDiveCommand);              // drive servo clockwise, take in water & pull weight forward (pull counterweight & plunger towards servo, at the bow of the glider)
   long previousMillis = millis();
@@ -107,7 +102,7 @@ void dive(int time){                            // Dive: Run the "dive" method. 
           x++;
         }
       currentPistonPosition=startPistonPosition-deltaMillis;
-      mapLED();
+      mapLED(); 
     
     }
   }
@@ -125,13 +120,11 @@ void dive(int time){                            // Dive: Run the "dive" method. 
   myservo.detach();                             // stop the servo, detaches the servo on SERVO_PIN from the servo object
   currentPistonPosition=0;
   mapLED();
-  //ledRGB_Write(255, 0, 0);                     // set LED to ORANGE to indicate that the glider is coasting in a dive
+  
 }                                               // end of method
 
 void rise(int time){                            // Rise: Run the "rise" method. This will start turning the servo to push out water & pitch the glider up
   int x = 0;
-  //ledRGB_Write(0, 200, 0);                      // set LED to GREEN to indicate that the glider is rising
-  //Serial.println("rising");                     // print status change to the serial port
   int startPistonPosition=currentPistonPosition;
   if(currentPistonPosition+time>=MaxPistonPosition){ //if plunger is already at maximum position no need to keep pushing it. 
     if(MaxPistonPosition-currentPistonPosition<500)
@@ -141,10 +134,10 @@ void rise(int time){                            // Rise: Run the "rise" method. 
   }
   myservo.attach(SERVO_PIN);                    // attaches the servo on SERVO_PIN to the servo object
   myservo.write(servoRiseCommand);              // drive servo counter-clockwise, pull weight aft (push counterweight & plunger away from servo)
- // unsigned long currentMillis = millis();
   long previousMillis = millis();
   long deltaMillis;                             //delta==change
   deltaMillis=millis()-previousMillis;
+  
   while (deltaMillis< time) { 
      
     if((currentPistonPosition+deltaMillis)>=MaxPistonPosition) break;
@@ -160,11 +153,10 @@ void rise(int time){                            // Rise: Run the "rise" method. 
     
   }
   myservo.detach();                             // stop the servo, detaches the servo on SERVO_PIN from the servo object
-  //currentMillis=millis();
+  
   currentPistonPosition=startPistonPosition+deltaMillis; //Update system on plunger position
   mapLED();
-  //Serial.println("coasting (rise)");            // print status change to the serial port
-  //ledRGB_Write(0, 0, 255);                      // set LED to BLUE to indicate that the glider is coasting in a rise
+  
 }                                               // end of method
 
 void ledRGB_Write(byte R, byte G, byte B){      // This method takes care of the details of setting a color and intensity of the RGB LED
@@ -182,8 +174,6 @@ void mapLED(){
 int readPot(int potPin){                        // this method reads a potentiometer to determine the pause time
   int potValue = analogRead(potPin);            // Read the Potentiometer
   int pauseTime = map(potValue, 0, 1023, minCoast, maxCoast); // scale the value to the diveDriveTime range defined by minDriveTime & maxDriveTime
-  //Serial.print("Coast Time: ");                 // print a lable to the serial port
-  //Serial.println(pauseTime);                    // print the pause time value to the serial port
   return pauseTime;                             // return the pause time, an intiger (int) value
 }                                               // end of method
 
@@ -198,10 +188,6 @@ void Sample(){
   Serial.print(degreesC);
   Serial.print(", ");
   Serial.print(ResultDepth);
-  
-  vertVel=ResultDepth-prevDepth;
-  Serial.print(", ");
-  Serial.print(vertVel);
   Serial.println();
 
   prevDepth=ResultDepth;
@@ -238,10 +224,10 @@ float readDepth(int pressurePinn){
     return ResultDepth;
 }
 
-void delayTwo(int time){                            // Rise: Run the "rise" method. This will start turning the servo to push out water & pitch the glider up
+void delayTwo(int time){                            
   int x = 0;
-  //Serial.println("rising");                     // print status change to the serial port
-    unsigned long currentMillis = millis();
+  
+  unsigned long currentMillis = millis();
   long previousMillis = currentMillis;
   while (currentMillis - previousMillis < time) { 
     currentMillis = millis();  
@@ -258,19 +244,19 @@ void delayTwo(int time){                            // Rise: Run the "rise" meth
 void loopTwo(){
 
   int pistonTime=2000;
-  int TargetDepth=30;
+  int TargetDepth=35;
   
   while(true){
     while(ResultDepth<TargetDepth){ //If glider is deeper than 25cm or shallower than 15cm
-      while(vertVel<=5){  //if glider vertical velocity is not diving at a rate of .5cm/sample AND glider is shallower than 15cm
+      while(ResultDepth<10){  //if glider vertical velocity is not diving at a rate of .5cm/sample AND glider is shallower than 15cm
         dive(1000);                      // DIVE-DIVE-DIVE: Run the "dive" method. This will start turning the servo to take in water & pitch the glider down
-        delayTwo(1000);      // read the pot and delay bassed on it's position, coast
+        delayTwo(2000);      // read the pot and delay bassed on it's position, coast
        }
     Serial.print("Diving, Waiting for Target depth:");
     Serial.print(ResultDepth);
     Serial.print(" of ");
     Serial.println(TargetDepth);
-    delayTwo(1000);
+    delayTwo(2000);
     }
     Serial.println("Reached Target Depth");
     while(pistonTime>=125){
@@ -285,16 +271,16 @@ void loopTwo(){
     ledRGB_Write(255,0,255);
     while(true){
       Serial.println("At targetDepth");
-      delayTwo(5000);
+      delayTwo(10000);
     }
-    //Sample();//Caused too many samples ~10/second
+    
   }
 }
 void riseToTarget(int target, int drivetime){
     Serial.println("Rise to Target Depth");
     while(ResultDepth>target){
         rise(drivetime);
-        delayTwo(2000);
+        delayTwo(4000);
     }
 
 }
@@ -302,6 +288,6 @@ void diveToTarget(int target, int drivetime){
   Serial.println("Dive to Target Depth");
   while(ResultDepth<target){
       dive(drivetime);
-      delayTwo(2000);
+      delayTwo(4000);
   }
 }
