@@ -261,7 +261,7 @@ void delayTwo(int time){
 void loopTwo(){
 
   int pistonTime=2000;
-  int TargetDepth=35;
+  int TargetDepth=15;
   
   while(true){
     while(ResultDepth<TargetDepth){ //If glider is deeper than 25cm or shallower than 15cm
