@@ -1,5 +1,6 @@
 # SeaGlide
 ### SeaGlide AUV files included in this repository:
+* Detailed Build Manual
 * 3D Printed Parts
 * IRRemote Header Files
 * Glider Arduino Code V1_0.ino
